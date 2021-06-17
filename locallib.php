@@ -27,6 +27,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once($CFG->dirroot . '/mod/assign/submissionplugin.php');
 /**
  * library class for noto submission plugin extending submission plugin base class
  *
@@ -38,6 +39,7 @@ defined('MOODLE_INTERNAL') || die();
 class assign_submission_noto extends assign_submission_plugin {
 
     const FILEAREA = 'noto_zips'; # also defined in notocopy.php
+    const E404 = "lof(): Error code: 404 status: Directory doesn't exist";
 
     /**
      * Get the name of the online text submission plugin
@@ -148,6 +150,7 @@ class assign_submission_noto extends assign_submission_plugin {
         }
         $notoapi = new assignsubmission_noto\notoapi();
         $dirlist_top = null;
+        $no_noto_user_error = false;
         try {
             #$dirlist_top = $notoapi->lod(assignsubmission_noto\notoapi::STARTPOINT);
             ## for lof() the top level dir must be a bit rebuilt
@@ -157,8 +160,20 @@ class assign_submission_noto extends assign_submission_plugin {
             $dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
 
         } catch (\moodle_exception $e) {
-            $message = get_string('cannotaddnoto', 'assignsubmission_noto', $e->getMessage());
-            \core\notification::warning($message);
+            if ($e->errorcode == self::E404) {
+                $no_noto_user_error = true;
+            } else {
+                $message = get_string('cannotaddnoto', 'assignsubmission_noto', $e->getMessage());
+                \core\notification::warning($message);
+                return;
+            }
+        }
+
+        if ($no_noto_user_error) {
+            $staticlabel = [];
+            $staticlabel[] = $mform->createElement('static', 'assignsubmission_noto_directory_label', '', get_string('notoaccount_notfound', 'assignsubmission_noto'));
+            $mform->addGroup($staticlabel, 'assignsubmission_noto_directory_label', '', ' ', false);
+            $mform->hideIf('assignsubmission_noto_directory_label', 'assignsubmission_noto_enabled', 'notchecked');
             return;
         }
 
@@ -269,7 +284,17 @@ class assign_submission_noto extends assign_submission_plugin {
             $dirlist_top = new stdClass();
             $dirlist_top->name = assignsubmission_noto\notoapi::STARTPOINT;
             $dirlist_top->type = 'directory';
-            $dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
+            try {
+                $dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
+            } catch (\moodle_exception $e) {
+                $message = get_string('cannotaddnoto', 'assignsubmission_noto', $e->getMessage());
+                if ($e->errorcode == self::E404) {
+                    $message = get_string('notoaccount_notfound', 'assignsubmission_noto');
+                }
+                #\core\notification::error($message);   # this goes to the very top of the page and gets covered by the top bar, therefore im adding the html element
+                $mform->addElement('html', self::get_error_html_block($message));
+                return;
+            }
             $PAGE->requires->js_call_amd('assignsubmission_noto/directorytree', 'init');
             $config = get_config('assignsubmission_noto');
             $maxdepth = assignsubmission_noto\notoapi::MAXDEPTH;
@@ -283,9 +308,6 @@ class assign_submission_noto extends assign_submission_plugin {
                 $apinotebookpath = sprintf('%s/%s', trim($config->apiserver, '/'), trim($config->apinotebookpath, '/'));
                 foreach ($directories as $d) {
                     $links = date('D M j G:i:s T Y', $submission->timemodified);
-                    #$links = sprintf("%s &nbsp;&nbsp;&nbsp;&nbsp; %s", date('D M j G:i:s T Y', $submission->timemodified), html_writer::tag('a', $d, array('href'=>$apinotebookpath.$d, 'target'=>'_blank')));
-                    #$links .= html_writer::tag('a', $d, array('href'=>$apinotebookpath.$d, 'target'=>'_blank'));
-                    #$links .= "<br/>\n";
                 }
                 $mform->addElement('static', 'submitnotoforgrading_tree_label', get_string('existingsubmissions', 'assignsubmission_noto'), $links);
             }
@@ -568,6 +590,21 @@ class assign_submission_noto extends assign_submission_plugin {
         if ($file) {
             return array($file->get_filename()=>$file);
         }
+    }
+
+    /* returns a HTML block arranged as a Moodle's error message block
+     * @param string $message
+     * @return string
+     */
+    public static function get_error_html_block(string $message): string {
+        return sprintf('
+            <span class="notifications" id="user-notifications">
+                <div class="alert alert-danger alert-block fade in " role="alert" data-aria-autofocus="true">
+                    <button type="button" class="close" data-dismiss="alert">×</button>
+                    %s
+                </div>
+            </span>
+        ', $message);
     }
 }
 

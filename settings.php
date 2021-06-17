@@ -44,3 +44,6 @@ $settings->add(new admin_setting_configtext('assignsubmission_noto/apikey',
 $settings->add(new admin_setting_configtext('assignsubmission_noto/maxdepth',
                    new lang_string('maxdepth', 'assignsubmission_noto'),
                    new lang_string('maxdepth_help', 'assignsubmission_noto'), 10, PARAM_INT));
+$settings->add(new admin_setting_configtext('assignsubmission_noto/userprofilepassword',
+                   new lang_string('userprofilepassword', 'assignsubmission_noto'),
+                   new lang_string('userprofilepassword_help', 'assignsubmission_noto'), '', PARAM_ALPHANUM));

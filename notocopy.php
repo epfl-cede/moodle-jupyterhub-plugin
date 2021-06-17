@@ -23,6 +23,7 @@
  */
 
 require_once(dirname(__FILE__). '/../../../../config.php');
+require_once(dirname(__FILE__). '/locallib.php');
 require_once($CFG->libdir . '/formslib.php');
 define('FILEAREA', 'noto_zips');    # it is also a constant in class assign_submission_noto in locallib.php, but i'm not requiring it only for 1 constant
 
@@ -95,7 +96,22 @@ $notoapi = new assignsubmission_noto\notoapi();
 $dirlist_top = new stdClass();
 $dirlist_top->name = assignsubmission_noto\notoapi::STARTPOINT;
 $dirlist_top->type = 'directory';
-$dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
+try {
+    $dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
+} catch (\moodle_exception $e) {
+    if ($e->errorcode == assign_submission_noto::E404) {
+        #throw new \moodle_exception(get_string('notoaccount_notfound', 'assignsubmission_noto'));  # an exception cannot render <a> properly - adding html
+        print $OUTPUT->header();
+        print assign_submission_noto::get_error_html_block(get_string('notoaccount_notfound', 'assignsubmission_noto'));
+        print html_writer::start_tag('a', array('class'=>'btn btn-primary', 'href'=>(string) new \moodle_url('/mod/assign/view.php', array('id'=>$cm->id))));
+        print get_string('continue');
+        print html_writer::end_tag('a');
+        print $OUTPUT->footer();
+        exit();
+    } else {
+        throw new \moodle_exception($e->getMessage());
+    }
+}
 
 $form = new notocopy_form(null, array('dirlist_top'=>$dirlist_top, 'id'=>$submission->id));
 

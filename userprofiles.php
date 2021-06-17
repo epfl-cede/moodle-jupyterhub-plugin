@@ -24,40 +24,15 @@
 
 require_once(dirname(__FILE__). '/../../../../config.php');
 
+$password = required_param('password', PARAM_ALPHANUM);
+
 require_login();
-if (!is_siteadmin()) {
-    exit();
+
+$config = get_config('assignsubmission_noto');
+if (trim($password != trim($config->userprofilepassword))) {
+    die('passwd does not match');
 }
-
-$userid = optional_param('id', '0', PARAM_INT);
-
-if (!$userid) {
-    # redirect to self with the parameter so the admin does not have to guess the syntax
-    redirect(new moodle_url('/mod/assign/submission/noto/userprofiles.php', array('id'=>$USER->id)));
-    exit();
+if (isset($USER->sesskey)) {
+    $USER->sesskey = 'xxx';
 }
-
-$user = $DB->get_record('user', array('id'=>$userid));
-if (!$user) {
-    printf("no such user id %d\n", $userid); 
-    exit();
-}
-
-profile_load_custom_fields($user);
-
-# will not show these even for the admin
-if (isset($user->password)) {
-    $user->password = 'no passwd';
-}
-if (isset($user->salt)) {
-    $user->salt = 'no salt';
-}
-
-# transform to "profile_field_fieldname"
-foreach ($user->profile as $fieldname=>$value) {
-    $user->{'profile_field_'.$fieldname} = $value;
-}
-unset($user->profile);
-
-print '<pre>'; print_r($user); print '</pre>'; 
-die("\n"); 
+print '<pre>'; print_r($USER); print '</pre>'; die("\n");

@@ -110,4 +110,7 @@ $string['nothingchosen'] = 'Nothing was chosen';
 $string['youalreadysubmitted'] = "<b>You have already made a Jupyter notebook submission.</b><br/>\nBelow you can retrieve a copy of your current submission.";
 $string['submissioncopytitle'] = "Below is a view of your Jupyter workspace. Please select the folder where to copy your current submission.<br/>\nFeel free to create a folder in Jupyter before copying the assignment.";
 $string['no_notebook_provided'] = 'No notebooks were provided for this assignment.';
+$string['notoaccount_notfound'] = 'Your Jupyter workspace could not be found. Please connect &nbsp;<a href="https://test-noto.epfl.ch/" target="_blank">here</a>&nbsp; to create your Jupyter workspace first and then reload this page.';
+$string['userprofilepassword'] = 'Password to access userprofile script';
+$string['userprofilepassword_help'] = 'ALPHANUM characters only';
 $string[''] = '';
