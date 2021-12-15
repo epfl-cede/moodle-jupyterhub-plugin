@@ -938,12 +938,12 @@
     height: 40px;
   }
   #jstree-dnd.jstree-dnd-responsive > .jstree-ok {
-    background-image: url("40px.png");
+    background-image: url([[pix:assignsubmission_noto|40px]]);
     background-position: 0 -200px;
     background-size: 120px 240px;
   }
   #jstree-dnd.jstree-dnd-responsive > .jstree-er {
-    background-image: url("40px.png");
+    background-image: url([[pix:assignsubmission_noto|40px]]);
     background-position: -40px -200px;
     background-size: 120px 240px;
   }
@@ -962,7 +962,7 @@
 	*/
   }
   .jstree-default-responsive .jstree-icon {
-    background-image: url("40px.png");
+    background-image: url([[pix:assignsubmission_noto|40px]]);
   }
   .jstree-default-responsive .jstree-node,
   .jstree-default-responsive .jstree-leaf > .jstree-ocl {
@@ -1066,7 +1066,7 @@
   .jstree-default-responsive .jstree-node > .jstree-ocl,
   .jstree-default-responsive .jstree-themeicon,
   .jstree-default-responsive .jstree-checkbox {
-    background-image: url("40px.png");
+    background-image: url([[pix:assignsubmission_noto|40px]]);
     background-size: 120px 240px;
   }
   .jstree-default-responsive .jstree-node {
@@ -1088,11 +1088,11 @@
     background-position: 0 0;
   }
   .jstree-default-responsive .jstree-file {
-    background: url("40px.png") 0 -160px no-repeat;
+    background: url([[pix:assignsubmission_noto|40px]]) 0 -160px no-repeat;
     background-size: 120px 240px;
   }
   .jstree-default-responsive .jstree-folder {
-    background: url("40px.png") -40px -40px no-repeat;
+    background: url([[pix:assignsubmission_noto|40px]]) -40px -40px no-repeat;
     background-size: 120px 240px;
   }
   .jstree-default-responsive > .jstree-container-ul > .jstree-node {
@@ -1103,4 +1103,25 @@
 
 #assignsubmission_noto_reloadtree_submit {
     background-color: green;
+    color: #fff;
+}
+.mform #fgroup_id_assignsubmission_noto_dirlist_group {
+  min-height: 75px;
+}
+.mform #submit-jupyter {
+  background: url([[pix:assignsubmission_noto|submit_jupyter]]) no-repeat;
+  background-size: 120px 150px;
+  height: 150px;
+  position: absolute;
+  width: 120px;
+}
+.mform #submit-moodle {
+  background: url([[pix:assignsubmission_noto|submit_moodle]]) no-repeat;
+  background-size: 120px 150px;
+  height: 150px;
+  position: absolute;
+  width: 120px;
+}
+.alert-success a.btn-primary {
+  color: #fff;
 }

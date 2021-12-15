@@ -28,6 +28,9 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/mod/assign/submissionplugin.php');
+require_once($CFG->dirroot . '/mod/assign/locallib.php');
+require_once($CFG->libdir.'/gradelib.php');
+
 /**
  * library class for noto submission plugin extending submission plugin base class
  *
@@ -49,6 +52,36 @@ class assign_submission_noto extends assign_submission_plugin {
         return get_string('noto', 'assignsubmission_noto');
     }
 
+    /**
+     * Get the custom header for the submission plugin
+     * @return html
+     */
+    public function view_header() {
+        global $USER;
+        if ($this->assignment->can_view_grades()) {
+            $fs = get_file_storage();
+            $file_record = array(
+                'contextid' => $this->assignment->get_context()->id,
+                'component' => 'assignsubmission_noto',
+                'filearea' => self::FILEAREA,
+                'itemid' => $this->assignment->get_instance()->id,
+                'userid' => $USER->id,
+                'filepath' => '/',
+                'filename' => sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
+            );
+            $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'],
+                $file_record['filepath'], $file_record['filename']);
+            if ($file) {
+                $submission = $this->assignment->get_user_submission($USER->id,true);
+                $return = html_writer::tag('a', get_string('get_copy_assignment', 'assignsubmission_noto'),
+                    array('href' => (string)new \moodle_url('/mod/assign/submission/noto/notocopy.php', array('id' => $submission->id))));
+            } else {
+                $return = get_string('no_notebook_provided', 'assignsubmission_noto');
+            }
+            return html_writer::div(html_writer::tag('h3', $this->get_name()).$return."</br></br>");
+        }
+        return null;
+    }
 
     /**
      * Get noto submission information from the database
@@ -70,7 +103,7 @@ class assign_submission_noto extends assign_submission_plugin {
      */
     public function remove(stdClass $submission) {
         global $DB, $USER;
-
+        $noto_name = self::get_noto_config_name($this->assignment->get_instance()->id);
         $submissionid = $submission ? $submission->id : 0;
         $assignmentid = $this->assignment->get_instance()->id;
         if ($submissionid) {
@@ -87,42 +120,13 @@ class assign_submission_noto extends assign_submission_plugin {
             'itemid'=>$assignmentid,
             'userid'=>$USER->id,
             'filepath'=>'/',
-            'filename'=>sprintf('submission_assignment%d_user%s.zip', $assignmentid, $USER->id),
+            'filename'=>sprintf($noto_name.'_user%s.zip', $USER->id),
         );
         $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
         if ($file) {
             $file->delete();
         }
         return true;
-    }
-
-    /**
-     * generates html prepated to be used in jtree - from a data structure obtained from processing stored notebook paths
-     * @param array &$dirlistgroup - the resulting array with form HTML elements added
-     * @param MoodleQuickForm $mform
-     * @param array $directories - the array formed from stored notebook paths
-     * @param string $path - a string directory to be added as a form element ID - otherwise the function knows only the current dirname, but none of parents
-     * @param int depth - the current depth in the tree (currently not used)
-     * @param int $maxdepth - not to calculate it many times in the recursive function (currently not used)
-     * @return array - the moodle form group array
-     */
-    private function display_submitdirectory_recursive (array &$dirlistgroup, MoodleQuickForm $mform, array $directories, string $path, int $depth, int $maxdepth): array {
-        global $OUTPUT;
-        if ($path === assignsubmission_noto\notoapi::STARTPOINT) {
-            $path = '';     # cosmetics, not to display './/Documentation'
-        }
-        foreach ($directories as $directory => $subdirectories) {
-            $dirlistgroup[] = $mform->createElement('html', '<ul>');
-            if ($subdirectories) {
-                $dirlistgroup[] = $mform->createElement('html', sprintf('<li id="%s/%s" data-jstree=\'{"disabled":true}\'>%s', $path, $directory, $directory));
-                $this->display_submitdirectory_recursive($dirlistgroup, $mform, $subdirectories, sprintf('%s/%s', $path, $directory), $depth +1, $maxdepth);
-            } else {
-                $dirlistgroup[] = $mform->createElement('html', sprintf('<li id="%s/%s">%s', $path, $directory, $directory));
-                $dirlistgroup[] = $mform->createElement('html', '</li>');
-            }
-            $dirlistgroup[] = $mform->createElement('html', '</ul>');
-        }
-        return $dirlistgroup;
     }
 
     /**
@@ -133,53 +137,30 @@ class assign_submission_noto extends assign_submission_plugin {
      */
 
     public function get_settings(MoodleQuickForm $mform) {
-        global $CFG, $COURSE, $PAGE;
-
         if ($this->assignment->get_default_instance()) {    # this should be empty if a new instance is being created
            $noto_config = $this->get_config();
             if (isset($noto_config->noto_enabled) && $noto_config->noto_enabled && isset($noto_config->directory_h) && $noto_config->directory_h) {
+                $mform->addElement('text', 'assignsubmission_noto_name', get_string('assignsubmission_noto_name', 'assignsubmission_noto'), array('id'=>'assignsubmission_noto_name', 'size'=>80));
+                $mform->addHelpButton('assignsubmission_noto_name', 'assignsubmission_noto_name', 'assignsubmission_noto');
+                $mform->setType('assignsubmission_noto_name', PARAM_TEXT);
                 $mform->addElement('text', 'assignsubmission_noto_directory', get_string('assignsubmission_noto_directory', 'assignsubmission_noto'), array('id'=>'assignsubmission_noto_directory', 'size'=>80));
                 $mform->setType('assignsubmission_noto_directory', PARAM_PATH);
                 $mform->addHelpButton('assignsubmission_noto_directory', 'assignsubmission_noto_directory', 'assignsubmission_noto');
-                $formdata = array('assignsubmission_noto_directory' => $noto_config->directory_h);
+                $formdata = array('assignsubmission_noto_name' => $noto_config->name, 'assignsubmission_noto_directory' => $noto_config->directory_h);
                 $mform->setDefaults($formdata);
                 $mform->freeze('assignsubmission_noto_directory');
                 $mform->hideIf('assignsubmission_noto_directory', 'assignsubmission_noto_enabled', 'notchecked');
-                return;
-            }
-        }
-        $notoapi = new assignsubmission_noto\notoapi();
-        $dirlist_top = null;
-        $no_noto_user_error = false;
-        try {
-            #$dirlist_top = $notoapi->lod(assignsubmission_noto\notoapi::STARTPOINT);
-            ## for lof() the top level dir must be a bit rebuilt
-            $dirlist_top = new stdClass();
-            $dirlist_top->name = assignsubmission_noto\notoapi::STARTPOINT;
-            $dirlist_top->type = 'directory';
-            $dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
-
-        } catch (\moodle_exception $e) {
-            if ($e->errorcode == self::E404) {
-                $no_noto_user_error = true;
-            } else {
-                $message = get_string('cannotaddnoto', 'assignsubmission_noto', $e->getMessage());
-                \core\notification::warning($message);
+                $mform->hideIf('assignsubmission_noto_name', 'assignsubmission_noto_enabled', 'notchecked');
                 return;
             }
         }
 
-        if ($no_noto_user_error) {
-            $staticlabel = [];
-            $staticlabel[] = $mform->createElement('static', 'assignsubmission_noto_directory_label', '', get_string('notoaccount_notfound', 'assignsubmission_noto'));
-            $mform->addGroup($staticlabel, 'assignsubmission_noto_directory_label', '', ' ', false);
-            $mform->hideIf('assignsubmission_noto_directory_label', 'assignsubmission_noto_enabled', 'notchecked');
-            return;
-        }
+        $mform->addElement('text', 'assignsubmission_noto_name', get_string('assignsubmission_noto_name', 'assignsubmission_noto'), array('id'=>'assignsubmission_noto_name', 'size'=>80));
+        $mform->addHelpButton('assignsubmission_noto_name', 'assignsubmission_noto_name', 'assignsubmission_noto');
+        $mform->setType('assignsubmission_noto_name', PARAM_TEXT);
 
-        $PAGE->requires->js_call_amd('assignsubmission_noto/directorytree', 'init');
-
-        $mform->addElement('text', 'assignsubmission_noto_directory', get_string('assignsubmission_noto_directory', 'assignsubmission_noto'), array('id'=>'assignsubmission_noto_directory', 'size'=>80));
+        $mform->addElement('text', 'assignsubmission_noto_directory', get_string('assignsubmission_noto_directory', 'assignsubmission_noto').
+            '<div id="submit-moodle"></div>', array('id'=>'assignsubmission_noto_directory', 'size'=>80));
         $mform->setType('assignsubmission_noto_directory', PARAM_PATH);
         $mform->addHelpButton('assignsubmission_noto_directory', 'assignsubmission_noto_directory', 'assignsubmission_noto');
         $mform->freeze('assignsubmission_noto_directory');
@@ -187,25 +168,16 @@ class assign_submission_noto extends assign_submission_plugin {
         $mform->addElement('hidden', 'assignsubmission_noto_directory_h', '', array('id'=>'assignsubmission_noto_directory_h'));  # _h is for "hidden" if you're wondering
         $mform->setType('assignsubmission_noto_directory_h', PARAM_TEXT);
 
-        $config = get_config('assignsubmission_noto');
-        $maxdepth = assignsubmission_noto\notoapi::MAXDEPTH;
-        if (isset($config->maxdepth) && $config->maxdepth) {
-            $maxdepth = $config->maxdepth;
-        }
-
         $staticlabel = [];
         $staticlabel[] = $mform->createElement('static', 'assignsubmission_noto_directory_label', '', get_string('assignsubmission_noto_directory_label', 'assignsubmission_noto'));
         $mform->addGroup($staticlabel, 'assignsubmission_noto_directory_label', '', ' ', false);
-
-        $dirlistgroup = array();
-        $dirlistgroup[] = $mform->createElement('html', '<div id="jstree">');
-        $dirlistgroup = assignsubmission_noto\nototreerenderer::display_lof_recursive($dirlistgroup, $mform, $dirlist_top, assignsubmission_noto\notoapi::STARTPOINT, 0, $maxdepth);
-        $dirlistgroup[] = $mform->createElement('html', '</div>');
-
-        $mform->addGroup($dirlistgroup, 'assignsubmission_noto_dirlist_group', '', ' ', false);
+        assign_submission_noto::mform_add_catalog_tree($mform, $this->assignment->get_course()->id);
+        $mform->addElement('button', 'assignsubmission_noto_reload', get_string('reloadtree', 'assignsubmission_noto'), ['id'=>'assignsubmission_noto_reloadtree_submit']);
         $mform->hideIf('assignsubmission_noto_directory_label', 'assignsubmission_noto_enabled', 'notchecked');
         $mform->hideIf('assignsubmission_noto_dirlist_group', 'assignsubmission_noto_enabled', 'notchecked');
         $mform->hideIf('assignsubmission_noto_directory', 'assignsubmission_noto_enabled', 'notchecked');
+        $mform->hideIf('assignsubmission_noto_name', 'assignsubmission_noto_enabled', 'notchecked');
+        $mform->hideIf('assignsubmission_noto_reload', 'assignsubmission_noto_enabled', 'notchecked');
     }
 
     /**
@@ -219,6 +191,19 @@ class assign_submission_noto extends assign_submission_plugin {
         $assignsubmission_noto_directory_h = '';
         $assignsubmission_noto_enabled = 0;
 
+        // Update or save assignment noto name
+        if (!empty($data->assignsubmission_noto_enabled)) {
+            if (!empty($data->assignsubmission_noto_name)) {
+                $assignsubmission_noto_name = self::slugify($data->assignsubmission_noto_name);
+                $this->set_config('name', self::slugify($assignsubmission_noto_name));
+            } else if (!empty($data->assignsubmission_noto_directory_h)) { // Only for new entries as we still want to be able to access old records
+                $directory = (empty($data->assignsubmission_noto_directory_h) ? $data->assignsubmission_noto_directory : $data->assignsubmission_noto_directory_h);
+                $dirparts = explode('/', $directory);
+                $assignsubmission_noto_name = array_pop($dirparts);
+                $this->set_config('name', self::slugify($assignsubmission_noto_name));
+            }
+        }
+
         if (isset($data->assignsubmission_noto_enabled) && $data->assignsubmission_noto_enabled && isset($data->assignsubmission_noto_directory_h) && $data->assignsubmission_noto_directory_h) {
             $assignsubmission_noto_directory_h = $data->assignsubmission_noto_directory_h;
             $assignsubmission_noto_enabled = 1;
@@ -227,10 +212,11 @@ class assign_submission_noto extends assign_submission_plugin {
         if (!$assignsubmission_noto_enabled) {
             return true;    # this covers also the situation when "Jupiter notebooks" is enabled but no directory is chosen. We just dont save it
         }
+
         $this->set_config('directory_h', $assignsubmission_noto_directory_h);
         $this->set_config('noto_enabled', $assignsubmission_noto_enabled);
 
-        $notoapi = new assignsubmission_noto\notoapi();
+        $notoapi = new assignsubmission_noto\notoapi($this->assignment->get_course()->id);
         $zfs_response = $notoapi->zfs(assignsubmission_noto\notoapi::STARTPOINT .$data->assignsubmission_noto_directory_h);
         if (isset($zfs_response->blob) && $zfs_response->blob) {
             $zip_bin = base64_decode($zfs_response->blob);
@@ -265,47 +251,11 @@ class assign_submission_noto extends assign_submission_plugin {
      * @return true if elements were added to the form
      */
     public function get_form_elements($submission, MoodleQuickForm $mform, stdClass $data) {
-        global $PAGE, $DB, $USER;
-
-#        $fs = get_file_storage();
-#        $file_record = array(
-#            'contextid'=>$this->assignment->get_context()->id,
-#            'component'=>'assignsubmission_noto',
-#            'filearea'=>self::FILEAREA,
-#            'itemid'=>$this->assignment->get_instance()->id,
-#            'userid'=>$USER->id,
-#            'filepath'=>'/',
-#            'filename'=>sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
-#        );
-#        $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
-#        if ($file) {
-
-            $notoapi = new assignsubmission_noto\notoapi();
-            $dirlist_top = new stdClass();
-            $dirlist_top->name = assignsubmission_noto\notoapi::STARTPOINT;
-            $dirlist_top->type = 'directory';
-            try {
-                $dirlist_top->children = $notoapi->lof(assignsubmission_noto\notoapi::STARTPOINT);
-            } catch (\moodle_exception $e) {
-                $message = get_string('cannotaddnoto', 'assignsubmission_noto', $e->getMessage());
-                if ($e->errorcode == self::E404) {
-                    $message = get_string('notoaccount_notfound', 'assignsubmission_noto');
-                }
-                #\core\notification::error($message);   # this goes to the very top of the page and gets covered by the top bar, therefore im adding the html element
-                $mform->addElement('html', self::get_error_html_block($message));
-                return;
-            }
-            $PAGE->requires->js_call_amd('assignsubmission_noto/directorytree', 'init');
-            $config = get_config('assignsubmission_noto');
-            $maxdepth = assignsubmission_noto\notoapi::MAXDEPTH;
-            if (isset($config->maxdepth) && $config->maxdepth) {
-                $maxdepth = $config->maxdepth;
-            }
+        global $DB;
             $existing_submissions = $DB->get_record('assignsubmission_noto', array('assignment'=>$this->assignment->get_instance()->id, 'submission'=>$submission->id));
             if ($existing_submissions && $existing_submissions->directory) {
                 $directories = explode("\n", $existing_submissions->directory);
                 $links = '';
-                $apinotebookpath = sprintf('%s/%s', trim($config->apiserver, '/'), trim($config->apinotebookpath, '/'));
                 foreach ($directories as $d) {
                     $links = date('D M j G:i:s T Y', $submission->timemodified);
                 }
@@ -318,13 +268,8 @@ class assign_submission_noto extends assign_submission_plugin {
             $mform->freeze('assignsubmission_noto_directory');
             $mform->addElement('hidden', 'assignsubmission_noto_directory_h', '', array('id'=>'assignsubmission_noto_directory_h'));  # _h is for "hidden" if you're wondering
             $mform->setType('assignsubmission_noto_directory_h', PARAM_TEXT);
-
-            $dirlistgroup = array();
-            $dirlistgroup[] = $mform->createElement('html', '<div id="jstree">');
-            $dirlistgroup = assignsubmission_noto\nototreerenderer::display_lof_recursive($dirlistgroup, $mform, $dirlist_top, assignsubmission_noto\notoapi::STARTPOINT, 0, $maxdepth);
-            $dirlistgroup[] = $mform->createElement('html', '</div>');
-            $mform->addGroup($dirlistgroup, 'assignsubmission_noto_dirlist_group', '', ' ', false);
             $cm = get_coursemodule_from_instance('assign', $this->assignment->get_instance()->id);
+            assign_submission_noto::mform_add_catalog_tree($mform, $this->assignment->get_course()->id);
             $mform->addElement(
                 'static',
                 'refreshtreebutton',
@@ -332,11 +277,8 @@ class assign_submission_noto extends assign_submission_plugin {
                 html_writer::tag(
                     'a',
                     get_string('reloadtree', 'assignsubmission_noto'),
-                    ['href'=>new \moodle_url('/mod/assign/view.php', ['id'=>$cm->id, 'action'=>'editsubmission']), 'class'=>'btn', 'id'=>'assignsubmission_noto_reloadtree_submit'])
+                    ['href'=>new \moodle_url('/mod/assign/view.php', ['id'=>$cm->id, 'action'=>'editsubmission']), 'class'=>'btn btn-primary', 'id'=>'assignsubmission_noto_reloadtree_submit'])
             );
-#        } else {
-#            $mform->addElement('html', '<p>'.get_string('assignmentnotready', 'assignsubmission_noto').'</p>');
-#        }
         return true;
     }
 
@@ -351,7 +293,7 @@ class assign_submission_noto extends assign_submission_plugin {
         global $USER, $DB;
 
         $notosubmission = $this->get_noto_submission($submission->id);
-
+        $noto_name = self::get_noto_config_name($this->assignment->get_instance()->id);
         // onlinetext legacy
         $groupname = null;
         $groupid = 0;
@@ -380,19 +322,19 @@ class assign_submission_noto extends assign_submission_plugin {
             # this situation is possible when a file submission is added without noto
             return true;
         }
-        $notoapi = new assignsubmission_noto\notoapi();
+        $notoapi = new assignsubmission_noto\notoapi($this->assignment->get_course()->id);
         $zfs_response = $notoapi->zfs(assignsubmission_noto\notoapi::STARTPOINT . $submit_dir);
         if (isset($zfs_response->blob) && $zfs_response->blob) {
             $zip_bin = base64_decode($zfs_response->blob);
             $fs = get_file_storage();
             $file_record = array(
-                'contextid'=>$this->assignment->get_context()->id,
-                'component'=>'assignsubmission_noto',
-                'filearea'=>self::FILEAREA,
-                'itemid'=>$this->assignment->get_instance()->id,
-                'userid'=>$USER->id,
-                'filepath'=>'/',
-                'filename'=>sprintf('submission_assignment%d_user%s.zip', $this->assignment->get_instance()->id, $USER->id),
+                'contextid' => $this->assignment->get_context()->id,
+                'component' => 'assignsubmission_noto',
+                'filearea' => self::FILEAREA,
+                'itemid' => $this->assignment->get_instance()->id,
+                'userid' => $USER->id,
+                'filepath' => '/',
+                'filename' => sprintf($noto_name.'_user%s.zip', $USER->id),
             );
             // only one (last) submission is stored as a zip
             $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
@@ -427,7 +369,6 @@ class assign_submission_noto extends assign_submission_plugin {
             $event->trigger();
             return $notosubmission->id > 0;
         }
-        // all done, everyone's happy
     }
 
      /**
@@ -441,45 +382,43 @@ class assign_submission_noto extends assign_submission_plugin {
         global $USER;
         $cm = get_coursemodule_from_instance('assign', $submission->assignment);
         $context = context_module::instance($cm->id);
-        $return = '';
-        if (has_capability('mod/assign:grade', $context)) {
-            $notosubmission = $this->get_noto_submission($submission->id);
-            if ($notosubmission) {
-                $return = html_writer::tag(
-                    'a',
-                    get_string('viewsubmissionsteacher', 'assignsubmission_noto'),
-                    ['href'=>(string) new moodle_url('/mod/assign/submission/noto/viewsubmissions.php', ['id'=>$submission->id])]
-                );
-            }
-        } else {
-            # display the "get copy" link only if a teacher uploaded a seed folder
+        # display the "get copy" link only if a teacher uploaded a seed folder
+        $action = optional_param('action', '', PARAM_TEXT);
+        if ($action !== 'grading') {
             $fs = get_file_storage();
             $file_record = array(
-                'contextid'=>$this->assignment->get_context()->id,
-                'component'=>'assignsubmission_noto',
-                'filearea'=>self::FILEAREA,
-                'itemid'=>$this->assignment->get_instance()->id,
-                'userid'=>$USER->id,
-                'filepath'=>'/',
-                'filename'=>sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
+                'contextid' => $this->assignment->get_context()->id,
+                'component' => 'assignsubmission_noto',
+                'filearea' => self::FILEAREA,
+                'itemid' => $this->assignment->get_instance()->id,
+                'userid' => $USER->id,
+                'filepath' => '/',
+                'filename' => sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
             );
             $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
             if ($file) {
-                $return = html_writer::tag('a', get_string('get_copy_assignment', 'assignsubmission_noto'), array('href'=>(string) new \moodle_url('/mod/assign/submission/noto/notocopy.php', array('id'=>$submission->id))));
+                $return = html_writer::tag('a', get_string('get_copy_assignment', 'assignsubmission_noto'), array('href' => (string)new \moodle_url('/mod/assign/submission/noto/notocopy.php', array('id' => $submission->id))));
             } else {
                 $return = get_string('no_notebook_provided', 'assignsubmission_noto');
             }
-            $notosubmission = $this->get_noto_submission($submission->id);
-            if ($notosubmission) {
+        }
+        $notosubmission = $this->get_noto_submission($submission->id);
+        if ($notosubmission) {
+            if ($return) {
+                $return .= "<br/>\n";
+            }
+            if (has_capability('mod/assign:grade', $context)) {
+                $return .= html_writer::tag(
+                    'a',
+                    get_string('viewsubmissionsteacher', 'assignsubmission_noto'),
+                    ['href' => (string)new moodle_url('/mod/assign/submission/noto/viewsubmissions.php', ['id' => $submission->id])]
+                );
+            } else {
                 if ($return) {
                     $return .= "<br/>\n";
                 }
-#                $return .= html_writer::tag(
-#                    'a',
-#                    get_string('viewsubmissions', 'assignsubmission_noto'),
-#                    ['href'=> new moodle_url('/mod/assign/view.php', ['id'=>$cm->id, 'action'=>'editsubmission'])]
-#                );
-                $return .= html_writer::tag('a', get_string('viewsubmissions', 'assignsubmission_noto'), ['href'=>(string) new moodle_url('/mod/assign/submission/noto/submissioncopy.php', ['id'=>$submission->id])]);
+                $return .= html_writer::tag('a', get_string('viewsubmissions', 'assignsubmission_noto'), ['href' => (string)new moodle_url('/mod/assign/submission/noto/submissioncopy.php', ['id' => $submission->id])]);
+
             }
         }
         return $return;
@@ -575,7 +514,7 @@ class assign_submission_noto extends assign_submission_plugin {
     public function get_files(stdClass $submission, stdClass $user) {
         $result = array();
         $fs = get_file_storage();
-
+        $noto_name = self::get_noto_config_name($this->assignment->get_instance()->id);
         $file_record = array(
             'contextid'=>$this->assignment->get_context()->id,
             'component'=>'assignsubmission_noto',
@@ -583,13 +522,124 @@ class assign_submission_noto extends assign_submission_plugin {
             'itemid'=>$this->assignment->get_instance()->id,
             'userid'=>$user->id,
             'filepath'=>'/',
-            'filename'=>sprintf('submission_assignment%d_user%s.zip', $this->assignment->get_instance()->id, $user->id),
+            'filename'=>sprintf($noto_name.'_user%s.zip', $user->id),
         );
         $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
 
         if ($file) {
             return array($file->get_filename()=>$file);
         }
+    }
+
+    /**
+     * Produce content of the CSV gradebook file
+     *
+     * @param stdClass $submission The submission
+     * @return string - return a string with csv content
+     */
+    private static function get_grades_csv(stdClass $submission) {
+        global $DB;
+        $out = "";
+        $csvdata =[];
+        $cm = get_coursemodule_from_instance('assign', $submission->assignment);
+        $feedbackcomments = assign_submission_noto::get_noto_config($cm->instance, 'enabled', 'comments', 'assignfeedback');
+        // Headers
+        $headerline = [
+            get_string('identifier', 'assignsubmission_noto'),
+            get_string('fullname', 'assignsubmission_noto'),
+            get_string('emailaddress', 'assignsubmission_noto'),
+            get_string('status', 'assignsubmission_noto'),
+            get_string('grade', 'assignsubmission_noto'),
+            get_string('maximumgrade', 'assignsubmission_noto'),
+            get_string('gradecanchange', 'assignsubmission_noto'),
+            get_string('lastmodified_submission', 'assignsubmission_noto'),
+            get_string('lastmodified_grade', 'assignsubmission_noto'),
+
+        ];
+        if ($feedbackcomments) {
+            $headerline[] = get_string('feedback_comments', 'assignsubmission_noto');
+        }
+        $csvdata[] = $headerline;
+        // CSV content
+        $graderecord = \grade_get_grades($cm->course, 'mod', 'assign', $cm->instance, $submission->userid);
+        $graderecord = array_pop($graderecord->items);
+        // User data
+        $user = $DB->get_record('user', ['id' => $submission->userid]);
+        $uniqueid = \assign::get_uniqueid_for_user_static($submission->assignment, $submission->userid);
+        $userdata = [];
+        $userdata[] = get_string('hiddenuser', 'assign') .$uniqueid;
+        $userdata[] = $user->firstname.' '.$user->lastname;
+        $userdata[] = $user->email;
+        $userdata[] = $submission->status;
+        $userdata[] = $graderecord->grades[$submission->userid]->str_grade;
+        $userdata[] = intval($graderecord->grademax);
+        $userdata[] = ($graderecord->grades[$submission->userid]->locked ? get_string('no') : get_string('yes'));
+        $submissiondate = (empty($graderecord->grades[$submission->userid]->datesubmitted) ? '-' :
+            date('d/m/Y H:i:s', $graderecord->grades[$submission->userid]->datesubmitted));
+        $userdata[] = $submissiondate;
+        $gradeddate = (empty($graderecord->grades[$submission->userid]->dategraded) ? '-' :
+            date('d/m/Y H:i:s', $graderecord->grades[$submission->userid]->dategraded));
+        $userdata[] = $gradeddate;
+        if ($feedbackcomments) {
+            $userdata[] = (empty($graderecord->grades[$submission->userid]->feedback) ? '-' : strip_tags($graderecord->grades[$submission->userid]->feedback));
+        }
+        $csvdata[] = $userdata;
+        foreach($csvdata as $arr) {
+            $out .= implode(",", $arr) . PHP_EOL;
+        }
+        return $out;
+    }
+
+    /**
+     * Produce a zip file with gradebook CSV
+     *
+     * @param stdClass $submission The submission
+     * @return \stored_file - return a stored zip with gradebook csv file
+     */
+    public static function get_submission_results_zip(stdClass $submission) : ?\stored_file {
+        $tempfolder = make_temp_directory('noto_submissions');
+        $tempfile = $tempfolder . '/' . rand();
+        $noto_name = self::get_noto_config_name($submission->assignment);
+        $csvfilename = sprintf($noto_name.'_user%s_grading.csv', $submission->userid);
+        $zipfilename = sprintf($noto_name.'_user%s_grading.zip', $submission->userid);
+        $csvcontent = self::get_grades_csv($submission);
+        $zip = new ZipArchive;
+        $res = $zip->open($tempfile, ZipArchive::CREATE);
+        if ($res === TRUE) {
+            $zip->addFromString($csvfilename, $csvcontent);
+            $zip->close();
+            $cm = get_coursemodule_from_instance('assign', $submission->assignment);
+            $context = context_module::instance($cm->id);
+            $fs = get_file_storage();
+            $fileinfo = array(
+                'contextid' => $context->id,
+                'component' => 'assignsubmission_noto',
+                'filearea' => self::FILEAREA,
+                'itemid' => $cm->instance,
+                'filepath'=>'/',
+                'filename' => $zipfilename);
+            $resfile = $fs->create_file_from_pathname($fileinfo, $tempfile);
+            return $resfile;
+        } else {
+            throw new \moodle_exception('Could not create grading file for upload.');
+        }
+        return null;
+    }
+
+    /**
+     * Delete a zip file with gradebook CSV from local files storage
+     *
+     * @param stdClass $submission The submission
+     * @return \stored_file - return a stored zip with gradebook csv file
+     */
+    public static function delete_submission_results_zip(stdClass $submission) :bool {
+        $cm = get_coursemodule_from_instance('assign', $submission->assignment);
+        $context = context_module::instance($cm->id);
+        $noto_name = self::get_noto_config_name($submission->assignment);
+        $zipfilename = sprintf($noto_name.'_user%s_grading.zip', $submission->userid);
+        $fs = get_file_storage();
+        $file = $fs->get_file($context->id, 'assignsubmission_noto', self::FILEAREA, $cm->instance, '/', $zipfilename);
+        return $file->delete();
     }
 
     /* returns a HTML block arranged as a Moodle's error message block
@@ -606,5 +656,90 @@ class assign_submission_noto extends assign_submission_plugin {
             </span>
         ', $message);
     }
+
+    public static function mform_add_catalog_tree(&$mform, $course) {
+        global $PAGE;
+
+        $PAGE->requires->js_call_amd('assignsubmission_noto/directorytree', 'init', [$course]);
+
+        $dirlistgroup = array();
+        $dirlistgroup[] = $mform->createElement('html', '<div id="jstree">');
+        $dirlistgroup[] = $mform->createElement('html', '</div>');
+        $mform->addGroup($dirlistgroup, 'assignsubmission_noto_dirlist_group', '', ' ', false);
+
+    }
+
+    /**
+     * Convert strings of text into simple kebab case slugs.
+     *
+     * @param string $input
+     * @return string
+     */
+    public static function slugify($input) {
+        // Down low
+        $input = strtolower($input);
+
+        // Replace common chars
+        $input = str_replace(
+            array('æ',  'ø',  'ö', 'ó', 'ô', 'Ò',  'Õ', 'Ý', 'ý', 'ÿ', 'ā', 'ă', 'ą', 'œ', 'å', 'ä', 'á', 'à', 'â', 'ã', 'ç', 'ć', 'ĉ', 'ċ', 'č', 'é', 'è', 'ê', 'ë', 'í', 'ì', 'î', 'ï', 'ú', 'ñ', 'ü', 'ù', 'û', 'ß',  'ď', 'đ', 'ē', 'ĕ', 'ė', 'ę', 'ě', 'ĝ', 'ğ', 'ġ', 'ģ', 'ĥ', 'ħ', 'ĩ', 'ī', 'ĭ', 'į', 'ı', 'ĳ',  'ĵ', 'ķ', 'ĺ', 'ļ', 'ľ', 'ŀ', 'ł', 'ń', 'ņ', 'ň', 'ŉ', 'ō', 'ŏ', 'ő', 'ŕ', 'ŗ', 'ř', 'ś', 'ŝ', 'ş', 'š', 'ţ', 'ť', 'ŧ', 'ũ', 'ū', 'ŭ', 'ů', 'ű', 'ų', 'ŵ', 'ŷ', 'ź', 'ż', 'ž', 'ſ', 'ƒ', 'ơ', 'ư', 'ǎ', 'ǐ', 'ǒ', 'ǔ', 'ǖ', 'ǘ', 'ǚ', 'ǜ', 'ǻ', 'ǽ',  'ǿ'),
+            array('ae', 'oe', 'o', 'o', 'o', 'oe', 'o', 'o', 'y', 'y', 'y', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'c', 'c', 'c', 'c', 'c', 'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i', 'u', 'n', 'u', 'u', 'u', 'es', 'd', 'd', 'e', 'e', 'e', 'e', 'e', 'g', 'g', 'g', 'g', 'h', 'h', 'i', 'i', 'i', 'i', 'i', 'ij', 'j', 'k', 'l', 'l', 'l', 'l', 'l', 'n', 'n', 'n', 'n', 'o', 'o', 'o', 'r', 'r', 'r', 's', 's', 's', 's', 't', 't', 't', 'u', 'u', 'u', 'u', 'u', 'u', 'w', 'y', 'z', 'z', 'z', 's', 'f', 'o', 'u', 'a', 'i', 'o', 'u', 'u', 'u', 'u', 'u', 'a', 'ae', 'oe'),
+            $input);
+
+        // Replace everything else
+        $input = preg_replace('/[^a-z0-9]/', '-', $input);
+
+        // Prevent double hyphen
+        $input = preg_replace('/-{2,}/', '-', $input);
+
+        // Prevent hyphen in beginning or end
+        $input = trim($input, '-');
+
+        // Prevent to long slug
+        if (strlen($input) > 91) {
+            $input = substr($input, 0, 92);
+        }
+
+        return $input;
+    }
+
+    /**
+     * Get assignment noto settingss
+     *
+     * @param int $assignmentid
+     * @param string $name
+     * @return string
+     */
+    public static function get_noto_config($assignmentid, $name, $plugin = 'noto', $subtype = 'assignsubmission') {
+        global $DB;
+        $dbparams = array('assignment' => $assignmentid,
+            'subtype' => $subtype,
+            'plugin' => $plugin,
+            'name' => $name);
+        $noto_name = $DB->get_field('assign_plugin_config', 'value', $dbparams, '*', IGNORE_MISSING);
+
+        return $noto_name;
+    }
+
+    /**
+     * Get assignment noto name setting
+     *
+     * @param int $assignmentid
+     * @param string $name
+     * @return string
+     */
+    public static function get_noto_config_name($assignmentid) {
+        global $DB;
+
+        $noto_name = self::get_noto_config($assignmentid, 'name');
+        // For old entries where noto name field did not exist
+        if (empty($noto_name)) {
+            $courseid = $DB->get_field('assign', 'course', ['id' => $assignmentid]);
+            $noto_name = sprintf('course%s_assignment%s', $courseid, $assignmentid);
+        }
+
+        return $noto_name;
+    }
+
+
 }
 

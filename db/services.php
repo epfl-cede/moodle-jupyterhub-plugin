@@ -15,15 +15,23 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * This file contains the version information for the noto submission plugin
- *
+ * Web service for assignsubmission_noto
  * @package    assignsubmission_noto
- * @copyright 2012 NetSpot {@link http://www.netspot.com.au}
+ * @subpackage db
+ * @since      Moodle 2.4
+ * @copyright  2021 Enovation
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
-$plugin->version   = 2020061505;
-$plugin->requires  = 2020060900;
-$plugin->component = 'assignsubmission_noto';
+$functions = array(
+        'assignsubmission_noto_get_jstree_json' => array(
+                'classname'     => 'assignsubmission_noto_external',
+                'methodname'    => 'get_jstree_json',
+                'classpath'     => 'mod/assign/submission/noto/externallib.php',
+                'description'   => 'Get the html of the jstree',
+                'type'          => 'read',
+                'ajax'          => true,
+                'capabilities'  => 'mod/assign:view',
+                'loginrequired' => true,
+        ),
+);

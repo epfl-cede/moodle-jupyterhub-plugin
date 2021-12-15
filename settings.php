@@ -26,6 +26,9 @@
 $settings->add(new admin_setting_configcheckbox('assignsubmission_noto/default',
                    new lang_string('default', 'assignsubmission_noto'),
                    new lang_string('default_help', 'assignsubmission_noto'), 0));
+$settings->add(new admin_setting_configcheckbox('assignsubmission_noto/ethz',
+                   new lang_string('ethzinstallation', 'assignsubmission_noto'),
+                   new lang_string('ethzinstallation_help', 'assignsubmission_noto'), 0));
 $settings->add(new admin_setting_configtext('assignsubmission_noto/apiserver',
                    new lang_string('apiserver', 'assignsubmission_noto'),
                    new lang_string('apiserver_help', 'assignsubmission_noto'), 'https://test-noto.epfl.ch', PARAM_URL, 60));
@@ -47,3 +50,34 @@ $settings->add(new admin_setting_configtext('assignsubmission_noto/maxdepth',
 $settings->add(new admin_setting_configtext('assignsubmission_noto/userprofilepassword',
                    new lang_string('userprofilepassword', 'assignsubmission_noto'),
                    new lang_string('userprofilepassword_help', 'assignsubmission_noto'), '', PARAM_ALPHANUM));
+$paramsoptions = ['test' => 'test', 'noto' => 'noto'];
+$settings->add(new admin_setting_configselect('assignsubmission_noto/authmethod',
+    new lang_string('authmethod', 'assignsubmission_noto'),
+    new lang_string('authmethod_help', 'assignsubmission_noto'), 'test', $paramsoptions));
+
+/* ===================== ETHZ installation settings =================================== */
+$settings->add(new admin_setting_configtext('assignsubmission_noto/apiurl',
+                   new lang_string('apiurl', 'assignsubmission_noto'),
+                   new lang_string('apiurl_help', 'assignsubmission_noto'), 'https://web2-xxx-[courseid].vvv.ethz.ch', PARAM_RAW, 60));
+$settings->add(new admin_setting_configtext('assignsubmission_noto/apiusername',
+                   new lang_string('apiusername', 'assignsubmission_noto'),
+                   new lang_string('apiusername_help', 'assignsubmission_noto'), '', PARAM_TEXT));
+$settings->add(new admin_setting_configtext('assignsubmission_noto/apisecretkey',
+                   new lang_string('apisecretkey', 'assignsubmission_noto'),
+                   new lang_string('apisecretkey_help', 'assignsubmission_noto'), '', PARAM_TEXT));
+$paramsoptions = ['username' => 'username', 'idnumber' => 'idnumber'];
+$settings->add(new admin_setting_configselect('assignsubmission_noto/apiusernameparam',
+                   new lang_string('apiusernameparam', 'assignsubmission_noto'),
+                   new lang_string('apiusernameparam_help', 'assignsubmission_noto'), '', $paramsoptions));
+$settings->add(new admin_setting_configtext('assignsubmission_noto/apiusernameparamprefix',
+                   new lang_string('apiusernameparamprefix', 'assignsubmission_noto'),
+                   new lang_string('apiusernameparamprefix_help', 'assignsubmission_noto'), '', PARAM_ALPHANUM));
+/* ==================================================================================== */
+$settings->add(new admin_setting_configtext('assignsubmission_noto/connectiontimeout',
+    new lang_string('connectiontimeout', 'assignsubmission_noto'),
+    new lang_string('connectiontimeout_help', 'assignsubmission_noto'), 3, PARAM_INT));
+$settings->add(new admin_setting_configtext('assignsubmission_noto/executiontimeout',
+    new lang_string('executiontimeout', 'assignsubmission_noto'),
+    new lang_string('executiontimeout_help', 'assignsubmission_noto'), 10, PARAM_INT));
+
+$PAGE->requires->js_call_amd('assignsubmission_noto/settings', 'init');

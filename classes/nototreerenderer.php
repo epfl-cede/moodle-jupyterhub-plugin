@@ -68,43 +68,54 @@ class nototreerenderer {
 
     /**
      * generates html prepated to be used in jtree - from a data structure obtained from the lof() API call
-     * @param array &$dirlistgroup - the resulting array with form HTML elements added
-     * @param MoodleQuickForm $mform
      * @param stdClass $directory - a node from the response of the API call
      * @param string $path - a string directory to be added as a form element ID - otherwise the function knows only the current dirname, but none of parents
      * @param int depth - the current depth in the tree
      * @param int $maxdepth - not to calculate it many times in the recursive function
-     * @return array - the moodle form group array
+     * @param array $data - result array of html elements
+     * @return array - output result html
      */
-    public static function display_lof_recursive (array &$dirlistgroup, \MoodleQuickForm $mform, \stdClass $directory, string $path, int $depth, int $maxdepth): array {
-        global $OUTPUT;
+    public static function display_lof_recursive (\stdClass $directory, string $path, int $depth, int $maxdepth, array &$data = []): array {
+        global $CFG;
+        $pass = false;
         if ($depth > $maxdepth) {
-            return $dirlistgroup;
+            return $data;
         }
         # the top element from $directory is not included, it's the home directory of the user
         if ($path === notoapi::STARTPOINT) {
             $path = '';     # cosmetics, not to display './/Documentation'
-            # nothing else
+            $pass = true;
+            $dataobject = new \stdClass();
         } else {
             if ($depth > $maxdepth) {
-                $dirlistgroup[] = $mform->createElement('html', sprintf('<li id="%s" data-jstree=\'{"icon":"%s", "disabled":true}\' >%s', $path, $OUTPUT->image_url('file', 'assignsubmission_noto'), $directory->name));
+                $dataobject = (object) ['id' => $path, "icon" => $CFG->wwwroot.'/mod/assign/submission/noto/pix/file.png',
+                    'state' => (object)['disabled' => true], 'text' => $directory->name];
             } else {
                 if ($directory->type == 'directory') {
-                    $dirlistgroup[] = $mform->createElement('html', sprintf('<li id="%s">%s', $path, $directory->name));
+                    $dataobject = (object) ['id' => $path, 'text' => $directory->name];
                 } else {
-                    $dirlistgroup[] = $mform->createElement('html', sprintf('<li id="%s" data-jstree=\'{"icon":"%s", "disabled":true}\' >%s', $path, $OUTPUT->image_url('file', 'assignsubmission_noto'), $directory->name));
+                    $dataobject = (object) ['id' => $path, "icon" => $CFG->wwwroot.'/mod/assign/submission/noto/pix/file.png',
+                        'state' => (object)['disabled' => true], 'text' => $directory->name];
                 }
             }
         }
         if (isset($directory->children) && $directory->children) {
-            $dirlistgroup[] = $mform->createElement('html', '<ul>');
+            $dataobject->children = [];
             foreach ($directory->children as $child) {
-                self::display_lof_recursive($dirlistgroup, $mform, $child, sprintf('%s/%s', $path, $child->name), $depth +1, $maxdepth);
+                if ($pass) {
+                    self::display_lof_recursive($child, sprintf('%s/%s', $path, $child->name), $depth +1, $maxdepth,
+                        $data);
+                } else {
+                    self::display_lof_recursive($child, sprintf('%s/%s', $path, $child->name), $depth +1, $maxdepth,
+                        $dataobject->children);
+                }
+
             }
-            $dirlistgroup[] = $mform->createElement('html', '</ul>');
-        } else {
-            $dirlistgroup[] = $mform->createElement('html', '</li>');
         }
-        return $dirlistgroup;
+        if (!$pass) {
+            $data[] = $dataobject;
+        }
+
+        return $data;
     }
 }

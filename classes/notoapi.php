@@ -34,25 +34,51 @@ class notoapi {
     const MAXDEPTH = 10;
 
     private $modconfig;
+    private $curloptions = [];
     /**
      * Constructor - reads the global module settings
      */
-    public function __construct ($user = null) {
+    public function __construct ($courseid = null) {
         $this->modconfig = get_config('assignsubmission_noto');
-        if (!$this->modconfig->apiserver) {
-            throw new \moodle_exception('"assignsubmission_noto | apiserver" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
-        }
-        if (!$this->modconfig->apiwspath) {
-            throw new \moodle_exception('"assignsubmission_noto | apiwspath" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
-        }
+        if ($this->modconfig->ethz) {
+            if (empty($this->modconfig->apiurl)) {
+                throw new \moodle_exception('"assignsubmission_noto | apiurl" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            } else {
+                if (is_null($courseid)) {
+                    $courseid = '';
+                }
+                $this->modconfig->apiurl = str_replace('[courseid]', $courseid, $this->modconfig->apiurl);
+            }
+            if (empty($this->modconfig->apiusername)) {
+                throw new \moodle_exception('"assignsubmission_noto | apiusername" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            } else {
+                $this->modconfig->apiuser = $this->modconfig->apiusername;
+            }
+            if (empty($this->modconfig->apisecretkey)) {
+                throw new \moodle_exception('"assignsubmission_noto | apisecretkey" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            }
+        } else {
+            if (empty($this->modconfig->apiserver)) {
+                throw new \moodle_exception('"assignsubmission_noto | apiserver" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            }
+            if (empty($this->modconfig->apiwspath)) {
+                throw new \moodle_exception('"assignsubmission_noto | apiwspath" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            }
 
-        if (!$this->modconfig->apiuser) {
-            throw new \moodle_exception('"assignsubmission_noto | apiuser" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            if (empty($this->modconfig->apiuser)) {
+                throw new \moodle_exception('"assignsubmission_noto | apiuser" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            }
+            if (empty($this->modconfig->apikey)) {
+                throw new \moodle_exception('"assignsubmission_noto | apikey" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+            }
+            $this->modconfig->apiurl = sprintf('%s/%s', trim($this->modconfig->apiserver, '/'), trim($this->modconfig->apiwspath, '/'));
         }
-        if (!$this->modconfig->apikey) {
-            throw new \moodle_exception('"assignsubmission_noto | apikey" not configured, see Site adm - Plugins - Activity modules - Assignment - Submission plugins - Jupiter Notebooks');
+        if (!empty($this->modconfig->connectiontimeout)) {
+            $this->curloptions['CURLOPT_CONNECTTIMEOUT'] = $this->modconfig->connectiontimeout;
         }
-        $this->modconfig->apiurl = sprintf('%s/%s', trim($this->modconfig->apiserver, '/'), trim($this->modconfig->apiwspath, '/'));
+        if (!empty($this->modconfig->executiontimeout)) {
+            $this->curloptions['CURLOPT_TIMEOUT'] = $this->modconfig->executiontimeout;
+        }
     }
     /**
      * /uzu API call (UnZip)
@@ -71,7 +97,7 @@ class notoapi {
         $payload_user = [
             'id' => self::noto_userid($user),
             'primary_email' => $user->email,
-            'auth_method' => $user->auth,
+            'auth_method' => empty($this->modconfig->authmethod) ? 'test' : $this->modconfig->authmethod,
         ];
         $payload = json_encode([
             'user'=> $payload_user,
@@ -88,7 +114,7 @@ class notoapi {
         ];
         $url = $url . '?' . http_build_query($param, '', '&');
         $curl = new \curl;
-        $resp = $curl->post($url, ['file' => $file]);
+        $resp = $curl->post($url, ['file' => $file], $this->curloptions);
         $resp = json_decode($resp);
         if (!$resp) {
             throw new \moodle_exception('uzu(): Empty response');
@@ -132,7 +158,7 @@ class notoapi {
         $payload_user = [
             'id' => self::noto_userid($user),
             'primary_email' => $user->email,
-            'auth_method' => $user->auth,
+            'auth_method' => empty($this->modconfig->authmethod) ? 'test' : $this->modconfig->authmethod,
         ];
         $payload = json_encode([
             'user'=> $payload_user,
@@ -148,7 +174,7 @@ class notoapi {
             'key' => $key,
         ];
         $curl = new \curl;
-        $resp = $curl->get($url, $param);
+        $resp = $curl->get($url, $param, $this->curloptions);
         $resp = json_decode($resp);
         if (!$resp) {
             throw new \moodle_exception('lof(): Empty response');
@@ -163,7 +189,7 @@ class notoapi {
                 throw new \moodle_exception('lof(): Error code: ' . $resp->return->code);
             }
         }
-        if (!$resp->payload) {
+        if (empty($resp->payload)) {
             throw new \moodle_exception('lof(): Empty response payload');
         }
         if (!$this->verify_payload($resp->payload, $resp->md5_payload)) {
@@ -191,7 +217,7 @@ class notoapi {
         $payload_user = [
             'id' => self::noto_userid($user),
             'primary_email' => $user->email,
-            'auth_method' => $user->auth,
+            'auth_method' => empty($this->modconfig->authmethod) ? 'test' : $this->modconfig->authmethod,
         ];
         $payload = json_encode([
             'user'=> $payload_user,
@@ -207,7 +233,7 @@ class notoapi {
             'key' => $key,
         ];
         $curl = new \curl;
-        $resp = $curl->get($url, $param);
+        $resp = $curl->get($url, $param, $this->curloptions);
         $resp = json_decode($resp);
         if (!$resp) {
             throw new \moodle_exception('lod(): Empty response');
@@ -251,7 +277,7 @@ class notoapi {
         $payload_user = [
             'id' => self::noto_userid($user),
             'primary_email' => $user->email,
-            'auth_method' => $user->auth,
+            'auth_method' => empty($this->modconfig->authmethod) ? 'test' : $this->modconfig->authmethod,
         ];
         $payload = json_encode([
             'user' => $payload_user,
@@ -267,7 +293,7 @@ class notoapi {
             'key' => $key,
         ];
         $curl = new \curl;
-        $resp = $curl->get($url, $param);
+        $resp = $curl->get($url, $param, $this->curloptions);
         if (!$resp) {
             throw new \moodle_exception('ls(): Empty response');
         }
@@ -300,7 +326,7 @@ class notoapi {
         $payload_user = [
             'id' => self::noto_userid($user),
             'primary_email' => $user->email,
-            'auth_method' => $user->auth,
+            'auth_method' => empty($this->modconfig->authmethod) ? 'test' : $this->modconfig->authmethod,
         ];
         $payload = json_encode([
             'user'=> $payload_user,
@@ -316,7 +342,7 @@ class notoapi {
             'key' => $key,
         ];
         $curl = new \curl;
-        $resp = $curl->get($url, $param);
+        $resp = $curl->get($url, $param, $this->curloptions);
         $resp = json_decode($resp);
         if (!$resp) {
             throw new \moodle_exception('zfs(): Empty response');
@@ -352,7 +378,13 @@ class notoapi {
      * @return string hashed payload
      */
     private function hash_payload (string $payload, string $md5_payload, int $timestamp) : string {
-        return base64_encode(hash_hmac('sha256', $this->modconfig->apiuser.$timestamp.$md5_payload, $this->modconfig->apikey, true));
+        if ($this->modconfig->ethz) {
+            return base64_encode(hash_hmac('sha256', $this->modconfig->apiusername.$timestamp.$md5_payload,
+                $this->modconfig->apisecretkey, true));
+        } else {
+            return base64_encode(hash_hmac('sha256', $this->modconfig->apiuser.$timestamp.$md5_payload,
+                $this->modconfig->apikey, true));
+        }
     }
 
     /**
@@ -386,13 +418,14 @@ class notoapi {
      * @return string user id
      */
     private static function noto_userid (\stdClass $user): string {
-        if ($user->idnumber) {
-            if (preg_match('/^\d{6}$/', $user->idnumber)) {
-                return (string) $user->idnumber;
-            } else {
-                return 'ch-epfl-moodle-idnumber-' . $user->idnumber;
+        $config = get_config('assignsubmission_noto');
+        if ($config->ethz) {
+            return $config->apiusernameparamprefix.$user->{$config->apiusernameparam};
+        } else {
+            if (!empty($user->idnumber)) {
+                    return (string) $user->idnumber;
             }
+            return 'ch-epfl-moodle-username-' . $user->username;
         }
-        return 'ch-epfl-moodle-username-' . $user->username;
     }
 }
