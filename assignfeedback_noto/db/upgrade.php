@@ -15,18 +15,27 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * This file contains the version information for the noto feedback plugin
+ * Upgrade code for the feedback_noto module.
  *
- * @package assignfeedback_noto
+ * @package   assignfeedback_noto
  * @copyright 2021 Enovation
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2022062100;
-$plugin->requires  = 2020060900;
-$plugin->component = 'assignfeedback_noto';
-$plugin->dependencies = array(
-    'assignsubmission_noto' => 2020061504,
-);
+/**
+ * Stub for upgrade code
+ * @param int $oldversion
+ * @return bool
+ */
+function xmldb_assignfeedback_noto_upgrade($oldversion) {
+    global $CFG, $DB;
+
+    $dbman = $DB->get_manager();
+    if ($oldversion < 2022061701) {
+        $dbman->install_one_table_from_xmldb_file($CFG->dirroot . '/mod/assign/feedback/noto/db/install.xml','assignfeedback_noto');
+        upgrade_plugin_savepoint(true, 2022061701, 'assignfeedback', 'noto');
+    }
+    return true;
+}

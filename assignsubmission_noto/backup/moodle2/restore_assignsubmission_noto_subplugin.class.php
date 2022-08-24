@@ -58,12 +58,13 @@ class restore_assignsubmission_noto_subplugin extends restore_subplugin {
 
         $data = (object)$data;
         $data->assignment = $this->get_new_parentid('assign');
+        $oldassignmentid = $data->assignment;
         $oldsubmissionid = $data->submission;
         $data->submission = $this->get_mappingid('submission', $data->submission);
 
         $DB->insert_record('assignsubmission_noto', $data);
 
-        $this->add_related_files('assignsubmission_noto', 'submissions_noto', 'submission', null, $oldsubmissionid);
+        $this->add_related_files('assignsubmission_noto', 'noto_zips', 'assign', null, null);
     }
 
 }

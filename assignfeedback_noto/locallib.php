@@ -26,6 +26,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 define('FILEAREA', 'noto_zips');
+define('ASSIGNFEEDBACK_NOTO_FILEAREA', 'feedback_noto');
+define('ASSIGNFEEDBACK_NOTO_MAXSUMMARYFILES', 1);
+
+require_once($CFG->dirroot . '/mod/assign/locallib.php');
 
 /**
  * Library class for noto feedback plugin extending feedback plugin base class.
@@ -62,7 +66,7 @@ class assign_feedback_noto extends assign_feedback_plugin {
      * @return bool
      */
     public function has_user_summary() {
-        return false;
+        return true;
     }
 
     /**
@@ -113,7 +117,11 @@ class assign_feedback_noto extends assign_feedback_plugin {
                 if (!$file) {
                     continue;
                 }
-                $dest_path = sprintf('%s/%s/'.$noto_name.'_student%d', assignsubmission_noto\notoapi::STARTPOINT, $data->assignsubmission_noto_directory_h, $userid);
+
+                $submission = $DB->get_record('assign_submission', array('assignment' =>
+                        $cm->instance, 'userid' => $userid));
+                $sub_user = $DB->get_record("user", array("id"  => $userid));
+                $dest_path = sprintf('%s/%s/'.$noto_name.'_course%d_student%d_submission%d_%s', assignsubmission_noto\notoapi::STARTPOINT, $data->assignsubmission_noto_directory_h, $cm->course ,$userid, $submission->id,$sub_user->firstname . '_' . $sub_user->lastname  );
                 $upload_response = $notoapi->uzu($dest_path, $file);
                 $new_directory_created = '';
                 if (isset($upload_response->extractpath) && $upload_response->extractpath) {
@@ -207,6 +215,227 @@ class assign_feedback_noto extends assign_feedback_plugin {
             $users = required_param('selectedusers', PARAM_SEQUENCE);
             return $this->view_batch_upload_noto(explode(',', $users));
         }
+
+        if ($action == 'uploadjupyter') {
+            // Link to upload
+            $cm = $this->assignment->get_course_module()->id;
+            $url = (string)new moodle_url('/mod/assign/feedback/noto/uploadfeedback.php', ['id' => $cm]);
+            redirect($url);
+            return;
+        }
+
         return '';
+    }
+
+    /**
+     * Return a list of the grading actions performed by this plugin.
+     * This plugin supports upload zip.
+     *
+     * @return array The list of grading actions
+     */
+    public function get_grading_actions() {
+        return array('uploadjupyter'=>get_string('uploadjupyter', 'assignfeedback_noto'));
+    }
+
+    /**
+     * Update the number of files in the file area.
+     *
+     * @param stdClass $grade The grade record
+     * @return bool - true if the value was saved
+     */
+    public function update_file_count($grade) {
+        global $DB;
+
+        $filefeedback = $this->get_file_feedback($grade->id);
+        if ($filefeedback) {
+            $filefeedback->numfiles = $this->count_files($grade->id, ASSIGNFEEDBACK_NOTO_FILEAREA);
+            return $DB->update_record('assignfeedback_noto', $filefeedback);
+        } else {
+            $filefeedback = new stdClass();
+            $filefeedback->numfiles = $this->count_files($grade->id, ASSIGNFEEDBACK_NOTO_FILEAREA);
+            $filefeedback->grade = $grade->id;
+            $filefeedback->assignment = $this->assignment->get_instance()->id;
+            return $DB->insert_record('assignfeedback_noto', $filefeedback) > 0;
+        }
+    }
+    /**
+     * Get file feedback information from the database.
+     *
+     * @param int $gradeid
+     * @return mixed
+     */
+    public function get_file_feedback($gradeid) {
+        global $DB;
+        return $DB->get_record('assignfeedback_noto', array('grade'=>$gradeid));
+    }
+    /**
+     * Count the number of files.
+     *
+     * @param int $gradeid
+     * @param string $area
+     * @return int
+     */
+    private function count_files($gradeid, $area) {
+
+        $fs = get_file_storage();
+        $files = $fs->get_area_files($this->assignment->get_context()->id,
+                'assignfeedback_noto',
+                $area,
+                $gradeid,
+                'id',
+                false);
+
+        return count($files);
+    }
+
+    /**
+     * Display the list of files in the feedback status table.
+     *
+     * @param stdClass $grade
+     * @param bool $showviewlink - Set to true to show a link to see the full list of files
+     * @return string
+     */
+    public function view_summary(stdClass $grade, & $showviewlink) {
+        global $DB;
+
+        $count = $this->count_files($grade->id, ASSIGNFEEDBACK_NOTO_FILEAREA);
+
+        // Show a view all link if the number of files is over this limit.
+        //TODO setup to show link for teacher and student to allow upload to Jupyter
+        $showviewlink = $count > ASSIGNFEEDBACK_NOTO_MAXSUMMARYFILES;
+
+        if ( $count > 0 && $count <= ASSIGNFEEDBACK_NOTO_MAXSUMMARYFILES) {
+            $assignmentid =  $this->assignment->get_instance()->id;
+
+            $notofeedbackid = $DB->get_field('assignfeedback_noto', 'id', ['assignment' => $assignmentid, 'grade' => $grade->id]);
+
+            $return .= html_writer::tag(
+                    'a',
+                    get_string('viewfeedbacksteacher', 'assignfeedback_noto'),
+                    ['href' => (string) new moodle_url('/mod/assign/feedback/noto/viewfeedback.php', ['id' => $notofeedbackid])]
+            );
+            return $return;
+        } else {
+            return "<br/>\n";
+        }
+
+    }
+    /**
+     * Get form elements for grading form.
+     *
+     * @param stdClass $grade
+     * @param MoodleQuickForm $mform
+     * @param stdClass $data
+     * @param int $userid The userid we are currently grading
+     * @return bool true if elements were added to the form
+     */
+    public function get_form_elements_for_user($grade, MoodleQuickForm $mform, stdClass $data, $userid) {
+
+        $fileoptions = $this->get_file_options();
+        $gradeid = $grade ? $grade->id : 0;
+        $elementname = 'files_' . $userid;
+
+        $data = file_prepare_standard_filemanager($data,
+                $elementname,
+                $fileoptions,
+                $this->assignment->get_context(),
+                'assignfeedback_noto',
+                ASSIGNFEEDBACK_NOTO_FILEAREA,
+                $gradeid);
+        $mform->addElement('filemanager', $elementname . '_filemanager', $this->get_name(), null, $fileoptions);
+
+        return true;
+    }
+    /**
+     * Get file areas returns a list of areas this plugin stores files.
+     *
+     * @return array - An array of fileareas (keys) and descriptions (values)
+     */
+    public function get_file_areas() {
+        return array(ASSIGNFEEDBACK_NOTO_FILEAREA=>$this->get_name());
+    }
+
+    /**
+     * Display the list of files in the feedback status table.
+     *
+     * @param stdClass $grade
+     * @return string
+     */
+    public function view(stdClass $grade) {
+        return $this->assignment->render_area_files('assignfeedback_noto',
+                ASSIGNFEEDBACK_NOTO_FILEAREA,
+                $grade->id);
+    }
+    /**
+     * Return true if there are no feedback files.
+     *
+     * @param stdClass $grade
+     */
+    public function is_empty(stdClass $grade) {
+        return $this->count_files($grade->id, ASSIGNFEEDBACK_NOTO_FILEAREA) == 0;
+    }
+
+    /**
+     * Get assignment noto settingss
+     *
+     * @param int $assignmentid
+     * @param string $name
+     * @return string
+     */
+    public static function get_noto_config($assignmentid, $name, $plugin = 'noto', $subtype = 'assignsubmission') {
+        global $DB;
+        $dbparams = array('assignment' => $assignmentid,
+                'subtype' => $subtype,
+                'plugin' => $plugin,
+                'name' => $name);
+        $noto_name = $DB->get_field('assign_plugin_config', 'value', $dbparams, '*', IGNORE_MISSING);
+
+        return $noto_name;
+    }
+
+    /**
+     * Get assignment noto name setting
+     *
+     * @param int $assignmentid
+     * @param string $name
+     * @return string
+     */
+    public static function get_noto_config_name($assignmentid) {
+        global $DB;
+
+        $noto_name = self::get_noto_config($assignmentid, 'name');
+        // For old entries where noto name field did not exist
+        if (empty($noto_name)) {
+            $courseid = $DB->get_field('assign', 'course', ['id' => $assignmentid]);
+            $noto_name = sprintf('course%s_assignment%s', $courseid, $assignmentid);
+        }
+
+        return $noto_name;
+    }
+    public static function mform_add_catalog_tree(&$mform, $course) {
+        global $PAGE;
+
+        $PAGE->requires->js_call_amd('assignsubmission_noto/directorytree', 'init', [$course]);
+
+        $dirlistgroup = array();
+        $dirlistgroup[] = $mform->createElement('html', '<div id="jstree">');
+        $dirlistgroup[] = $mform->createElement('html', '</div>');
+        $mform->addGroup($dirlistgroup, 'assignsubmission_noto_dirlist_group', '', ' ', false);
+
+    }
+
+    /**
+     * File format options.
+     *
+     * @return array
+     */
+    private function get_file_options() {
+        global $COURSE;
+
+        $fileoptions = array('subdirs'=>1,
+                'maxbytes'=>$COURSE->maxbytes,
+                'accepted_types'=>'*',
+                'return_types'=>FILE_INTERNAL);
+        return $fileoptions;
     }
 }

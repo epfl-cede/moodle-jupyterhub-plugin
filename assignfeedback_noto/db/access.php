@@ -15,18 +15,14 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * This file contains the version information for the noto feedback plugin
+ * Capability definitions for this module.
  *
- * @package assignfeedback_noto
+ * @package   assignfeedback_noto
  * @copyright 2021 Enovation
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2022062100;
-$plugin->requires  = 2020060900;
-$plugin->component = 'assignfeedback_noto';
-$plugin->dependencies = array(
-    'assignsubmission_noto' => 2020061504,
-);
+$capabilities = array();
+
+

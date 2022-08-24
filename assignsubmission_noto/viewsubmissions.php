@@ -101,7 +101,9 @@ if ($form->is_cancelled()) {
         throw new \moodle_exception("Submissison zip not found");
     }
     #$date_string = date('Ymd_HGs');
-    $dest_path = sprintf('%s/%s/'.$noto_name.'_student%d', assignsubmission_noto\notoapi::STARTPOINT, $data->assignsubmission_noto_directory_h, $submission->userid);
+    $sub_user = $DB->get_record("user", array("id"  => $submission->userid));
+//    $dest_path = sprintf('%s/%s/'.$noto_name.'_student%d', assignsubmission_noto\notoapi::STARTPOINT, $data->assignsubmission_noto_directory_h, $submission->userid);
+    $dest_path = sprintf('%s/%s/'.$noto_name.'_course%d_student%d_submission%d_%s', assignsubmission_noto\notoapi::STARTPOINT, $data->assignsubmission_noto_directory_h, $cm->course ,$submission->userid,$submissionid,$sub_user->firstname . '_' . $sub_user->lastname);
     $notoapi = new assignsubmission_noto\notoapi($cm->course);
     $upload_response = $notoapi->uzu($dest_path, $file);
     // [extractpath] => /test2/.///dir1/course2_assignment2-V2/test0/test0.1/course2_assignment2

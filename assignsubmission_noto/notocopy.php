@@ -100,7 +100,7 @@ if ($form->is_cancelled()) {
         'filearea'=>FILEAREA,
         'itemid'=>$cm->instance,
         'filepath'=>'/',
-        'filename'=>sprintf('notebook_seed_assignment%d.zip', $cm->instance),
+        'filename'=>sprintf('notebook_seed_assignment.zip', $cm->instance),
     );
     $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
     if (!$file) {

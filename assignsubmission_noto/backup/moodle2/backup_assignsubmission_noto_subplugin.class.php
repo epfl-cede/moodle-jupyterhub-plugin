@@ -42,21 +42,38 @@ class backup_assignsubmission_noto_subplugin extends backup_subplugin {
         // Create XML elements.
         $subplugin = $this->get_subplugin_element();
         $subpluginwrapper = new backup_nested_element($this->get_recommended_name());
+        $subplugin->add_child($subpluginwrapper);
+        /*
+        // Setup of Submission
         $subpluginelement = new backup_nested_element('submission_noto',
                                                       null,
-                                                      array('noto', 'onlineformat', 'submission'));
+                                                      array('paths', 'onlineformat', 'submission'));
 
         // Connect XML elements into the tree.
-        $subplugin->add_child($subpluginwrapper);
+        $subpluginwrapper->add_child($subpluginelement);
+        // Set source to populate the data.
+        $subpluginelement->set_source_table('assignsubmission_noto_copies',
+                                          array(' 	assignmentid' => backup::VAR_PARENTID));
+
+        $subpluginelement->annotate_files('assignsubmission_noto',
+                                          'noto_zips',
+                                          'submission');
+*/
+        // Submission files
+
+        $subpluginelement = new backup_nested_element('submission_noto',
+                null,
+                array('directory', 'onlineformat', 'assign','submission'));
         $subpluginwrapper->add_child($subpluginelement);
 
         // Set source to populate the data.
         $subpluginelement->set_source_table('assignsubmission_noto',
-                                          array('submission' => backup::VAR_PARENTID));
+                array('submission' => backup::VAR_PARENTID));
 
         $subpluginelement->annotate_files('assignsubmission_noto',
-                                          'submissions_noto',
-                                          'submission');
+                'noto_zips',
+                'assign');
+
         return $subplugin;
     }
 

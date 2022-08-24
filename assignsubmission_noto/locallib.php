@@ -67,7 +67,7 @@ class assign_submission_noto extends assign_submission_plugin {
                 'itemid' => $this->assignment->get_instance()->id,
                 'userid' => $USER->id,
                 'filepath' => '/',
-                'filename' => sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
+                'filename' => sprintf('notebook_seed_assignment.zip', $this->assignment->get_instance()->id),
             );
             $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'],
                 $file_record['filepath'], $file_record['filename']);
@@ -228,7 +228,7 @@ class assign_submission_noto extends assign_submission_plugin {
                 'itemid'=>$this->assignment->get_instance()->id,
                 'userid'=>$USER->id,
                 'filepath'=>'/',
-                'filename'=>sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
+                'filename'=>sprintf('notebook_seed_assignment.zip', $this->assignment->get_instance()->id),
             );
             $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
             if ($file) {
@@ -393,7 +393,7 @@ class assign_submission_noto extends assign_submission_plugin {
                 'itemid' => $this->assignment->get_instance()->id,
                 'userid' => $USER->id,
                 'filepath' => '/',
-                'filename' => sprintf('notebook_seed_assignment%d.zip', $this->assignment->get_instance()->id),
+                'filename' => sprintf('notebook_seed_assignment.zip', $this->assignment->get_instance()->id),
             );
             $file = $fs->get_file($file_record['contextid'], $file_record['component'], $file_record['filearea'], $file_record['itemid'], $file_record['filepath'], $file_record['filename']);
             if ($file) {
