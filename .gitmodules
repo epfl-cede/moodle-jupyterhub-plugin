@@ -2,3 +2,11 @@
 	path = moodle-mod-assign-feedback-noto
 	url = https://github.com/epfl-cede/moodle-mod-assign-feedback-noto.git
 	branch = main
+[submodule "moodle-mod-assign-submission-noto"]
+	path = moodle-mod-assign-submission-noto
+	url = https://github.com/epfl-cede/moodle-mod-assign-submission-noto.git
+	branch = main
+[submodule "jupyterhub-fileserver-api"]
+	path = jupyterhub-fileserver-api
+	url = https://github.com/epfl-cede/jupyterhub-fileserver-api.git
+	branch = master
