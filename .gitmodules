@@ -4,3 +4,7 @@
 [submodule "jupyterhub-fileserver-api"]
 	path = jupyterhub-fileserver-api
 	url = https://github.com/epfl-cede/jupyterhub-fileserver-api.git
+[submodule "moodle-mod-assign-feedback-noto"]
+	path = moodle-mod-assign-feedback-noto
+	url = https://github.com/epfl-cede/moodle-mod-assign-feedback-noto.git
+	branch = main
