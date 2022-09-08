@@ -6,8 +6,22 @@ All three are available from this git repository as submodules.
 
 Those plugins are designed to make the communication from Moodle to a JupyterHub installation possible, allowing Moodle users to access their Jupyter files from Moodle - and more.
 
-User documentation is available from this repository.
+# Documentation
+
+User (students and teachers) documentation is available from this repository.
 For technical documentation, please check to the submodules.
+
+# Cloning this repository with the submodules
+
+To clone this repository along with its submodules, use the `--recurse-submodules` option like so :
+
+```git clone --recurse-submodules https://github.com/chaconinc/MainProject```
+
+If you forgot to recurse the submodules while cloning the repository, run the following commands:
+* ```git submodule init```
+* ```git submodule update```
+
+# Moodle side deployment
 
 ## moodle-mod-assign-submission-noto plugin
 
@@ -35,7 +49,7 @@ Please use the git repository URLs directly for the deployment:
 * [epfl-cede/moodle-mod-assign-feedback-noto](https://github.com/epfl-cede/moodle-mod-assign-feedback-noto)
 * [epfl-cede/moodle-mod-assign-submission-noto](https://github.com/epfl-cede/moodle-mod-assign-submission-noto)
 
-# File Server API
+# JupyterHub side deployment
 
 On the JupyterHub side, an API needs to be deployed on a server that has access to all user's files - typically the File Server of the JupyterHub deployment.
 
